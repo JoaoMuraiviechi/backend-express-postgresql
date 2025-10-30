@@ -1,19 +1,48 @@
-import mongoose, { Document, Schema } from "mongoose";
+import { DataTypes, Model, Optional } from "sequelize";
+import sequelize from "../database/postgres";
+import { User } from "./User";
 
-export interface INote extends Document {
-    title: string;
-    content?: string;
-    tags?: string[];
-    user: mongoose.Types.ObjectId;
-    pinned?: boolean;
+interface NoteAttributes {
+  id: number;
+  title: string;
+  content?: string;
+  tags?: string[];
+  pinned?: boolean;
+  userId: number;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const noteSchema = new Schema<INote>({
-    title: { type: String, required: true, trim: true },
-    content: { type: String, default: "" },
-    tags: { type: [String], default: [] },
-    user: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    pinned: { type: Boolean, default: false }
-}, { timestamps: true });
+interface NoteCreationAttributes extends Optional<NoteAttributes, "id"> {}
 
-export const Note = mongoose.model<INote>("Note", noteSchema);
+export class Note extends Model<NoteAttributes, NoteCreationAttributes> implements NoteAttributes {
+  public id!: number;
+  public title!: string;
+  public content!: string;
+  public tags!: string[];
+  public pinned!: boolean;
+  public userId!: number;
+
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
+
+Note.init(
+  {
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    title: { type: DataTypes.STRING, allowNull: false },
+    content: { type: DataTypes.STRING, allowNull: false, defaultValue: "" },
+    tags: { type: DataTypes.ARRAY(DataTypes.STRING), defaultValue: [] },
+    pinned: { type: DataTypes.BOOLEAN, defaultValue: false },
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+  },
+  {
+    sequelize,
+    tableName: "notes",
+    timestamps: true,
+  }
+);
+
+// Relacionamento
+User.hasMany(Note, { foreignKey: "userId" });
+Note.belongsTo(User, { foreignKey: "userId" });

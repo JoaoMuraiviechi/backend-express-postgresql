@@ -1,18 +1,37 @@
-import mongoose, { Document, Schema } from "mongoose";
+import { DataTypes, Model, Optional } from "sequelize";
+import sequelize from "../database/postgres";
 
-export interface IUser extends Document {
+interface UserAttributes {
+  id: number;
   name: string;
   email: string;
   password: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
-const UserSchema: Schema<IUser> = new Schema(
-  {
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true, select: false },
-  },
-  { timestamps: true }
-);
+interface UserCreationAttributes extends Optional<UserAttributes, "id"> {}
 
-export const User = mongoose.model<IUser>("User", UserSchema);
+export class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
+  public id!: number;
+  public name!: string;
+  public email!: string;
+  public password!: string;
+
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
+
+User.init(
+  {
+    id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+    name: { type: DataTypes.STRING, allowNull: false },
+    email: { type: DataTypes.STRING, allowNull: false, unique: true },
+    password: { type: DataTypes.STRING, allowNull: false },
+  },
+  {
+    sequelize,
+    tableName: "users",
+    timestamps: true,
+  }
+);

@@ -23,21 +23,21 @@ const parseExpires = (expires: string | undefined): number => {
 const jwtExpiresSeconds = parseExpires(process.env.JWT_EXPIRES_IN);
 
 export const registerUser = async (name: string, email: string, password: string) => {
-  const existing = await User.findOne({ email });
+  // Verifica se já existe usuário com esse email
+  const existing = await User.findOne({ where: { email } });
   if (existing) throw Object.assign(new Error("E-mail já cadastrado."), { status: 409 });
 
+  // Cria hash da senha
   const hashed = await bcrypt.hash(password, 10);
-  const user = new User({ name, email, password: hashed });
-  await user.save();
+  const user = await User.create({ name, email, password: hashed });
 
-  const obj = user.toObject();
-  delete (obj as any).password;
-
-  return obj;
+  // Retorna objeto sem a senha
+  const { password: _, ...userWithoutPassword } = user.get({ plain: true });
+  return userWithoutPassword;
 };
 
 export const loginUser = async (email: string, password: string) => {
-  const user = await User.findOne({ email }).select("+password");
+  const user = await User.findOne({ where: { email }, attributes: ["id", "email", "password"] });
   if (!user) throw Object.assign(new Error("E-mail não encontrado."), { status: 401 });
 
   const match = await bcrypt.compare(password, user.password);
@@ -46,7 +46,7 @@ export const loginUser = async (email: string, password: string) => {
   const signOptions: SignOptions = { expiresIn: jwtExpiresSeconds };
 
   const token = jwt.sign(
-    { id: user._id, email: user.email },
+    { id: user.id, email: user.email },
     jwtSecret,
     signOptions
   );

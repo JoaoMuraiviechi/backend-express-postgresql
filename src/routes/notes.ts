@@ -1,16 +1,18 @@
-// src/routes/notes.routes.ts
 import { Router } from "express";
 import * as noteController from "../controllers/noteController";
 import { authMiddleware } from "../middlewares/authMiddleware";
 
 const notesRouter = Router();
 
-notesRouter.use(authMiddleware); // protege todas as rotas
+// Todas as rotas protegidas pelo JWT
+notesRouter.use(authMiddleware);
 
-notesRouter.post("/", noteController.create);
-notesRouter.get("/", noteController.list);
-notesRouter.get("/:id", noteController.getById);
-notesRouter.put("/:id", noteController.put);
-notesRouter.delete("/:id", noteController.remove);
+// CRUD completo
+notesRouter.post("/", noteController.create);       // Criar nota
+notesRouter.get("/", noteController.list);          // Listar todas as notas do usuário
+notesRouter.get("/:id", noteController.getById);    // Buscar nota por ID
+notesRouter.put("/:id", noteController.put);        // Substituir nota inteira
+notesRouter.patch("/:id", noteController.patch);    // Atualização parcial
+notesRouter.delete("/:id", noteController.remove);  // Deletar nota
 
 export { notesRouter };

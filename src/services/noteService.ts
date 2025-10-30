@@ -1,39 +1,39 @@
-import { Note, INote } from "../models/Note";
-import mongoose from "mongoose";
+import { Note } from "../models/Note";
+import { Op } from "sequelize";
 
-export const createNote = async (userId: string, data: Partial<INote>) => {
-    const note = new Note({ ...data, user: new mongoose.Types.ObjectId(userId) });
-    await note.save();
-    return note.toObject();
+export const createNote = async (userId: number, data: any) => {
+  const note = await Note.create({ ...data, userId });
+  return note.toJSON();
 };
 
-export const listNotes = async (userId: string, filters: any = {}) => {
-    const query: any = { user: userId };
+export const listNotes = async (userId: number, filters: any = {}) => {
+  const query: any = { userId };
 
-  // Aplique filtros simples, por exemplo ?title=foo, ?tag=bar, ?pinned=true
-    if (filters.title) query.title = { $regex: filters.title, $options: "i" };
-    if (filters.tag) query.tags = filters.tag;
-    if (filters.pinned !== undefined) query.pinned = filters.pinned === "true" || filters.pinned === true;
+  if (filters.title) query.title = { [Op.iLike]: `%${filters.title}%` };
+  if (filters.tag) query.tags = { [Op.contains]: [filters.tag] };
+  if (filters.pinned !== undefined) query.pinned = filters.pinned === "true" || filters.pinned === true;
 
-    return Note.find(query).sort({ updatedAt: -1 }).lean();
+  const notes = await Note.findAll({ where: query, order: [["updatedAt", "DESC"]] });
+  return notes.map(n => n.toJSON());
 };
 
-export const getNoteById = async (id: string) => {
-    if (!mongoose.Types.ObjectId.isValid(id)) return null;
-    return Note.findById(id).lean();
+export const getNoteById = async (id: number) => {
+  return Note.findByPk(id).then(n => n?.toJSON() || null);
 };
 
-export const replaceNote = async (id: string, data: Partial<INote>) => {
-    const updated = await Note.findByIdAndUpdate(id, data, { new: true, runValidators: true }).lean();
-    return updated;
+export const replaceNote = async (id: number, data: any) => {
+  const note = await Note.findByPk(id);
+  if (!note) return null;
+  await note.update(data);
+  return note.toJSON();
 };
 
-export const patchNote = async (id: string, data: Partial<INote>) => {
-    const updated = await Note.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true }).lean();
-    return updated;
+export const patchNote = async (id: number, data: any) => {
+  return replaceNote(id, data);
 };
 
-export const deleteNoteById = async (id: string) => {
-    await Note.findByIdAndDelete(id);
-    return;
+export const deleteNoteById = async (id: number) => {
+  const note = await Note.findByPk(id);
+  if (!note) return;
+  await note.destroy();
 };
