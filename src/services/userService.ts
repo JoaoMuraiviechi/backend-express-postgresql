@@ -1,55 +1,57 @@
-import { User } from "../models/User";
 import bcrypt from "bcrypt";
-import jwt, { Secret, SignOptions } from "jsonwebtoken";
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+import User from "../models/User";
 
-const jwtSecret: Secret = process.env.JWT_SECRET || "supersegredo123";
+dotenv.config();
 
-// Converte a string de tempo (ex: "1h") em segundos
-const parseExpires = (expires: string | undefined): number => {
-  if (!expires) return 3600; // default 1h
-  const match = expires.match(/^(\d+)([smhd])$/);
-  if (!match) return 3600;
-  const value = parseInt(match[1], 10);
-  const unit = match[2];
-  switch (unit) {
-    case "s": return value;
-    case "m": return value * 60;
-    case "h": return value * 3600;
-    case "d": return value * 86400;
-    default: return 3600;
-  }
-};
+const JWT_SECRET = process.env.JWT_SECRET as string;
 
-const jwtExpiresSeconds = parseExpires(process.env.JWT_EXPIRES_IN);
-
+// 🧩 Registrar novo usuário
 export const registerUser = async (name: string, email: string, password: string) => {
-  // Verifica se já existe usuário com esse email
-  const existing = await User.findOne({ where: { email } });
-  if (existing) throw Object.assign(new Error("E-mail já cadastrado."), { status: 409 });
+  const existingUser = await User.findOne({ where: { email } });
+  if (existingUser) {
+    throw new Error("E-mail já cadastrado.");
+  }
 
-  // Cria hash da senha
-  const hashed = await bcrypt.hash(password, 10);
-  const user = await User.create({ name, email, password: hashed });
+  if (password.length < 6) {
+    throw new Error("A senha deve ter pelo menos 6 caracteres.");
+  }
 
-  // Retorna objeto sem a senha
-  const { password: _, ...userWithoutPassword } = user.get({ plain: true });
-  return userWithoutPassword;
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const newUser = await User.create({ name, email, password: hashedPassword });
+
+  // remove o campo password do objeto retornado
+  const userObj = newUser.toJSON() as any;
+  delete userObj.password;
+
+  return userObj;
 };
 
+// 🔐 Login do usuário
 export const loginUser = async (email: string, password: string) => {
-  const user = await User.findOne({ where: { email }, attributes: ["id", "email", "password"] });
-  if (!user) throw Object.assign(new Error("E-mail não encontrado."), { status: 401 });
+  const user = await User.findOne({ where: { email } });
+  if (!user) {
+    throw new Error("Usuário não encontrado.");
+  }
 
-  const match = await bcrypt.compare(password, user.password);
-  if (!match) throw Object.assign(new Error("Senha inválida."), { status: 401 });
+  const validPassword = await bcrypt.compare(password, user.password);
+  if (!validPassword) {
+    throw new Error("Senha incorreta.");
+  }
 
-  const signOptions: SignOptions = { expiresIn: jwtExpiresSeconds };
+  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: "1h" });
 
-  const token = jwt.sign(
-    { id: user.id, email: user.email },
-    jwtSecret,
-    signOptions
-  );
+  const userObj = user.toJSON() as any;
+  delete userObj.password;
 
-  return token;
+  return { user: userObj, token };
+};
+
+// 👤 Buscar usuário por ID (opcional)
+export const getUserById = async (id: number) => {
+  const user = await User.findByPk(id, {
+    attributes: { exclude: ["password"] },
+  });
+  return user;
 };
